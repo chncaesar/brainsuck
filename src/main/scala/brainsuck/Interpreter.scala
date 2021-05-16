@@ -69,6 +69,7 @@ object Interpreter {
   }
 
   def main(args: Array[String]): Unit = {
+    // Build options
     val optionParser = new OptionParser[Config]("brainsuck") {
       head("brainsuck", "0.1.0")
 
@@ -83,13 +84,14 @@ object Interpreter {
         .text("Input file.")
         .action { (input, config) => config.copy(input = input) }
     }
-
+    // Parse options
     optionParser.parse(args, Config()).foreach {
       case Config(optimizationLevel, input) =>
+        // code -- Parsed execution plan(AST)
         val code = benchmark("Parsing") {
           BrainsuckParser(Source.fromFile(input, "UTF-8").mkString)
         }
-
+        // Build optimizer
         val optimizer = new Optimizer {
           override def batches =
             Seq(
@@ -97,11 +99,11 @@ object Interpreter {
               Batch("LoopSimplification", Clears :: Scans :: MultisAndCopies :: Nil, Once)
             ).take(optimizationLevel)
         }
-
+        // Optimize execution plan
         val optimized = benchmark("Optimization") {
           if (optimizationLevel > 0) optimizer(code) else code
         }
-
+        // Run the plan
         benchmark("Execution") {
           Instruction.untilHalt(optimized, new Machine(0, new Memory()))
         }
